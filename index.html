@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ndj-AI v0.1 | Hard Boot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
+
+        /* ... Estilos de Boot e Terminal permanecem os mesmos ... */
+        #boot-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000; z-index: 1000; transition: 0.5s; }
+        #pulsing-logo { width: 80px; height: 80px; margin-bottom: 20px; background-image: url('https://raw.githubusercontent.com/pitocoofc/Ndj-lib/main/assets/logo.png'); background-size: contain; background-repeat: no-repeat; animation: pulse 2.5s ease-in-out 2; }
+        .loader-container { width: 120px; height: 2px; background: #222; overflow: hidden; }
+        .loader-bar { width: 0%; height: 100%; background: #fff; transition: 5s linear; }
+
+        #terminal-screen { position: fixed; inset: 0; display: none; flex-direction: column; padding: 10px; background: #050505; color: #00ff41; font-family: 'Courier New', monospace; font-size: 7px; line-height: 9px; z-index: 999; overflow: hidden; }
+        #term-content { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+
+        /* CHAT INTERFACE */
+        #main-chat-screen { position: fixed; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%) scale(0); display: none; flex-direction: column; background: #fff; z-index: 1001; transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
+        #main-chat-screen.fullscreen { transform: translate(-50%, -50%) scale(1); }
+
+        #chat-header { text-align: center; padding: 40px 0 10px; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        
+        .msg { max-width: 85%; padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.4; }
+        .user-msg { align-self: flex-end; background: #000; color: #fff; border-bottom-right-radius: 2px; }
+        .ai-msg { align-self: flex-start; background: #f0f0f0; color: #333; border-bottom-left-radius: 2px; }
+
+        /* BOTÃO DENTRO DA MENSAGEM */
+        .view-code-btn { background: #000; color: #fff; border: none; padding: 8px 15px; border-radius: 10px; margin-top: 10px; cursor: pointer; font-size: 12px; display: block; width: fit-content; }
+
+        /* MODAL DE CÓDIGO (OVERLAY) */
+        #code-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2005; display: none; flex-direction: column; padding: 20px; justify-content: center; }
+        .modal-content { background: #1e1e1e; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+        .modal-header { background: #333; padding: 12px; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 12px; }
+        .modal-body { padding: 20px; color: #9cdcfe; font-family: 'Consolas', monospace; font-size: 13px; white-space: pre; overflow-x: auto; max-height: 60vh; }
+        .modal-footer { padding: 15px; display: flex; gap: 10px; background: #252526; }
+        .modal-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+        .copy-btn { background: #fff; color: #000; }
+        .close-btn { background: #444; color: #fff; }
+
+        /* FOOTER */
+        #chat-footer { padding: 20px; background: #fff; }
+        .input-wrapper { display: flex; align-items: center; background: #f4f4f4; border-radius: 25px; padding: 5px 15px; border: 1px solid #eee; }
+        #chatInput { flex: 1; border: none; background: transparent; outline: none; padding: 10px; font-size: 14px; }
+        #sendBtn { background: #000; color: #fff; border: none; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.1); opacity: 1; } }
+    </style>
+</head>
+<body onload="initSystem()">
+
+    <div id="code-modal">
+        <div class="modal-content">
+            <div class="modal-header"><span>javascript</span><span id="typing-status">Digitando...</span></div>
+            <div class="modal-body" id="modal-code-text"></div>
+            <div class="modal-footer">
+                <button class="modal-btn copy-btn" onclick="copyModalCode()">Copiar Código</button>
+                <button class="modal-btn close-btn" onclick="closeModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="boot-screen">
+        <div id="pulsing-logo"></div>
+        <div class="loader-container"><div id="loading-fill" class="loader-bar"></div></div>
+    </div>
+
+    <div id="terminal-screen"><div id="term-content"></div></div>
+
+    <div id="main-chat-screen">
+        <div id="chat-header"><div id="app-name">Ndj-AI</div><div id="app-version">0.1</div></div>
+        <div id="chat-box"></div>
+        <div id="chat-footer">
+            <div class="input-wrapper">
+                <input type="text" id="chatInput" placeholder="Perguntar ao Ndj-AI..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button id="sendBtn" onclick="sendMessage()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ... (Mesmas funções de boot do código anterior) ...
+        const logs = ["DECRYPTING NDJ-LIB ASSETS...", "900 DOWNLOADS DETECTED", "READY_EVENT -> clientReady", "SYNCING respostas.json..."];
+        
+        function initSystem() {
+            const bar = document.getElementById('loading-fill');
+            setTimeout(() => bar.style.width = '100%', 100);
+            setTimeout(() => {
+                document.getElementById('boot-screen').style.display = 'none';
+                document.getElementById('terminal-screen').style.display = 'flex';
+                runTerminal();
+            }, 5000);
+        }
+
+        function runTerminal() {
+            const term = document.getElementById('term-content');
+            const screen = document.getElementById('terminal-screen');
+            let count = 0;
+            const interval = setInterval(() => {
+                const line = document.createElement('div');
+                line.textContent = `[${new Date().toLocaleTimeString()}] ${logs[Math.floor(Math.random() * logs.length)]}`;
+                term.appendChild(line);
+                screen.scrollTop = screen.scrollHeight; 
+                count++;
+                if (count > 120) { clearInterval(interval); showIA(); }
+            }, 30); 
+        }
+
+        function showIA() {
+            document.getElementById('terminal-screen').style.display = 'none';
+            const chat = document.getElementById('main-chat-screen');
+            chat.style.display = 'flex';
+            setTimeout(() => chat.classList.add('fullscreen'), 100);
+        }
+
+        let currentCode = "";
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const val = input.value.trim();
+            if (val === "") return;
+
+            addMsg(val, 'user-msg');
+            input.value = "";
+
+            setTimeout(() => {
+                if (val.toLowerCase().includes('economia')) {
+                    const code = "const economy = require('./ndj-economy');\n\neconomy.addMoney(user.id, 1000);\nconsole.log('Saldo atualizado com sucesso!');";
+                    addMsgWithCode("Aqui está o código solicitado:", code);
+                } else {
+                    addMsg("Comando não reconhecido. Tente 'economia'.", 'ai-msg');
+                }
+            }, 800);
+        }
+
+        function addMsg(text, type) {
+            const box = document.getElementById('chat-box');
+            const m = document.createElement('div');
+            m.className = `msg ${type}`;
+            m.textContent = text;
+            box.appendChild(m);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // ADICIONA MENSAGEM COM BOTÃO DE CÓDIGO
+        function addMsgWithCode(text, code) {
+            const box = document.getElementById('chat-box');
+            const m = document.createElement('div');
+            m.className = 'msg ai-msg';
+            m.innerHTML = `
+                ${text}
+                <button class="view-code-btn" onclick="openCodeModal(\`${code}\`)">Ver Código</button>
+            `;
+            box.appendChild(m);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function openCodeModal(code) {
+            currentCode = code;
+            const modal = document.getElementById('code-modal');
+            const textDiv = document.getElementById('modal-code-text');
+            const status = document.getElementById('typing-status');
+            
+            modal.style.display = 'flex';
+            textDiv.textContent = "";
+            status.textContent = "Digitando...";
+
+            let i = 0;
+            const typing = setInterval(() => {
+                textDiv.textContent += code.charAt(i);
+                i++;
+                if (i >= code.length) {
+                    clearInterval(typing);
+                    status.textContent = "Pronto!";
+                }
+            }, 15);
+        }
+
+        function closeModal() { document.getElementById('code-modal').style.display = 'none'; }
+
+        function copyModalCode() {
+            navigator.clipboard.writeText(currentCode);
+            alert("Código copiado!");
+        }
+    </script>
+</body>
+</html>
