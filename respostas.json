@@ -13,5 +13,5 @@
       "codigo": "// Digite 'economia' ou 'v15' para exemplos práticos.\nconsole.log('Aguardando comando...');"
     }
   },
-  "fallback": "Desculpe, Ghost. Não encontrei essa função no meu banco de dados. Tente perguntar sobre 'economia' ou 'v15'."
+  "fallback": "Desculpe, Programador. Não encontrei essa função no meu banco de dados. Tente perguntar sobre outro assunto. Eu sou um modelo teste da Ndj-lib para facilitar sua programação e progressão no mumdo do terminal e estou disposto a melhorar para te ajudar com o tempo."
 }
